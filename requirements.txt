@@ -1,0 +1,7 @@
+numpy
+sounddevice
+scipy
+faster-whisper
+rapidfuzz
+vosk
+websockets

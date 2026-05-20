@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Surgical Robot Control</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a192f 0%, #172a45 100%);
+            color: #e6f1ff;
+
+
+            height: 100vh;
+            overflow: hidden; /* ✅ no scrolling */
+            padding: 14px;
+        }
+        .right-panel{
+            display:flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+
+        .right-top-badge{
+            border-radius: 10px;
+            padding: 12px 14px;
+            display:flex;
+            align-items:center;
+            gap: 10px;
+            font-weight: 700;
+        }
+
+
+        /* disconnected = red */
+        .right-top-badge.disconnected{
+            background: rgba(255, 68, 68, 0.18);
+            border: 1px solid rgba(255, 68, 68, 0.6);
+            color: #ff7777;
+        }
+
+
+        /* connected = green */
+        .right-top-badge.connected{
+            background: rgba(100, 255, 218, 0.18);
+            border: 1px solid rgba(100, 255, 218, 0.6);
+            color: #64ffda;
+        }
+
+
+        .patient-title{
+            font-size: 22px;
+            font-weight: 800;
+            margin-top: 6px;
+            margin-bottom: 6px;
+            color: #e6f1ff;
+        }
+
+
+        .patient-item{
+            background: rgba(100,255,218,0.06);
+            border-radius: 10px;
+            padding: 14px;
+            display:flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(100,255,218,0.08);
+        }
+
+
+        .patient-left{
+            display:flex;
+            align-items:center;
+            gap: 10px;
+            font-size: 14px;
+            opacity: 0.95;
+        }
+
+
+        .patient-icon{
+            font-size: 18px;
+        }
+
+
+        .patient-value{
+            font-size: 22px;
+            font-weight: 800;
+            color: #64ffda;
+        }
+
+
+        .unit{
+            font-size: 12px;
+            opacity: 0.7;
+            margin-left: 4px;
+        }
+
+
+        .emergency-btn-big{
+            margin-top: auto;
+            padding: 26px 18px;
+            font-size: 20px;
+            border-radius: 14px;
+        }
+        .tool-card{
+            background: #0a192f;
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            margin-bottom: 12px;
+            border: 1px solid rgba(100,255,218,0.08);
+        }
+
+
+        .tool-image-wrap{
+            background: rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+
+
+        #taskImage{
+            width: 130px;
+            height: 130px;
+            object-fit: contain;
+            filter: drop-shadow(0px 0px 12px rgba(100,255,218,0.25));
+        }
+
+        #cameraVideo{
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
+            object-fit: contain; /* ✅ no cut */
+            background: #000;
+        }
+
+        .tool-status-title{
+            font-size: 22px;
+            font-weight: 800;
+            color: #64ffda;
+            margin-bottom: 6px;
+        }
+
+
+        .tool-status-msg{
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+
+        .camera-title-row{
+            display:flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .app-title{
+            text-align:center;
+            font-size: 44px;
+            font-weight: 800;
+            letter-spacing: 8px;
+            margin-bottom: 10px;
+            color: #64ffda;
+            text-shadow: 0 0 20px rgba(100,255,218,0.35);
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1.35fr 0.75fr;  /* left, center, thin right */
+            gap: 20px;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: rgba(23, 42, 69, 0.7);
+            border: 1px solid rgba(100, 255, 218, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            backdrop-filter: blur(10px);
+        }
+
+        .panel-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            color: #64ffda;
+        }
+
+        .icon {
+            font-size: 28px;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 1000;
+        }
+
+        .connection-status.connected {
+            background: rgba(100, 255, 218, 0.2);
+            border: 1px solid #64ffda;
+            color: #64ffda;
+        }
+
+        .connection-status.disconnected {
+            background: rgba(255, 68, 68, 0.2);
+            border: 1px solid #ff4444;
+            color: #ff4444;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #64ffda;
+        }
+
+        .status-dot.disconnected {
+            background: #ff4444;
+        }
+
+        /* Camera Feed */
+        .camera-display {
+            background: #0a192f;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100px;
+            position: relative;
+        }
+
+        .hand-icon {
+            font-size: 80px;
+            color: #64ffda;
+        }
+
+        .camera-status {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+
+        .live-dot {
+            width: 10px;
+            height: 10px;
+            background: #ff4444;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .fps {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        .camera-controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .control-btn {
+            background: rgba(100, 255, 218, 0.1);
+            border: 1px solid #64ffda;
+            color: #64ffda;
+            padding: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .control-btn:hover {
+            background: rgba(100, 255, 218, 0.2);
+        }
+
+        .control-label {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-bottom: 4px;
+        }
+
+        .control-value {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        /* System Status */
+        .mode-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .mode-btn {
+            padding: 16px;
+            border-radius: 8px;
+            border: 2px solid transparent;
+            background: rgba(100, 255, 218, 0.05);
+            color: #8892b0;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .mode-btn.active {
+            border-color: #64ffda;
+            background: rgba(100, 255, 218, 0.15);
+            color: #64ffda;
+        }
+
+        .voice-command-box {
+            background: #0a192f;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mic-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            color: #64ffda;
+        }
+
+        .voice-status {
+            font-size: 24px;
+            color: #64ffda;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+
+        .command-log {
+            max-height: 110px;
+            overflow-y: auto;
+            width: 100%;
+            margin-top: 12px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(100, 255, 218, 0.1);
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .metric-card {
+            background: rgba(100, 255, 218, 0.05);
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .metric-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #64ffda;
+        }
+
+        /* Robot Health */
+        .health-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: rgba(100, 255, 218, 0.05);
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .health-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+
+        .health-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #64ffda;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(100, 255, 218, 0.1);
+            border-radius: 3px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #64ffda, #5ce1e6);
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        .health-subtitle {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-top: 4px;
+        }
+
+        .diagnostics {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 20px;
+        }
+
+        .diagnostics-title {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+
+        .diagnostic-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(100, 255, 218, 0.1);
+        }
+
+        .emergency-btn {
+            width: 100%;
+            padding: 20px;
+            background: rgba(255, 68, 68, 0.2);
+            border: 2px solid #ff4444;
+            border-radius: 8px;
+            color: #ff4444;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            margin-top: 20px;
+        }
+
+        .emergency-btn:hover {
+            background: rgba(255, 68, 68, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-title">A.N.J.A</div>
+    <div class="dashboard">
+        <!-- Camera Feed Panel -->
+        <div class="panel">
+            <div class="panel-title">
+                <span class="icon">🧰</span> Tool Status
+            </div>
+            <!-- TOOL DISPLAY CARD (TOP) -->
+            <div class="tool-card">
+                <div class="tool-image-wrap">
+                    <img id="taskImage" src="images/idle.png" alt="Task" />
+                </div>
+
+                <div class="tool-status-title" id="taskTitle">Awaiting command...</div>
+                <div class="tool-status-msg" id="taskMessage">Say: "A.N.J.A bring scalpel"</div>
+            </div>
+
+            <!-- CAMERA FEED (BOTTOM) -->
+            <div class="camera-title-row">
+                <div class="panel-title" style="margin: 0;">
+                    <span class="icon">📹</span> Camera Feed
+                </div>
+            </div>
+
+            <div class="camera-display">
+                <div class="camera-status">
+                <div class="live-dot"></div>
+                <span>LIVE</span>
+                </div>
+
+
+                <video id="cameraVideo" autoplay playsinline muted></video>
+            </div>
+
+            <div class="camera-controls">
+                <div class="control-btn">
+                    <div class="control-label">Zoom</div>
+                    <div class="control-value">2.5x</div>
+                </div>
+                <div class="control-btn">
+                    <div class="control-label">Focus</div>
+                    <div class="control-value">AUTO</div>
+                </div>
+                <div class="control-btn">
+                    <div class="control-label">Tracking</div>
+                    <div class="control-value">ON</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Status Panel -->
+        <div class="panel">
+            <div class="panel-title">
+                <span class="icon">📊</span> System Status
+            </div>
+            
+            <div style="font-size: 12px; opacity: 0.7; margin-bottom: 12px;">CURRENT MODE</div>
+            <div class="mode-selector">
+                <div class="mode-btn active" id="idleBtn">IDLE</div>
+                <div class="mode-btn" id="activeBtn">ACTIVE</div>
+            </div>
+
+            <div class="voice-command-box">
+                <div class="mic-icon">🎤</div>
+                <div style="font-size: 12px; opacity: 0.7; margin-bottom: 8px;">VOICE COMMAND</div>
+                <div class="voice-status" id="voiceStatus">Connecting to voice system...</div>
+                <div id="commandLog" class="command-log"></div>
+                <div style="margin-top: 14px; width: 100%;">
+                <div style="font-size: 12px; opacity: 0.7; margin-bottom: 8px;">
+                    MANUAL COMMAND
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <input
+                    id="manualInput"
+                    type="text"
+                    placeholder='Type: anja bring scalpel'
+                    style="
+                        flex: 1;
+                        padding: 12px;
+                        border-radius: 8px;
+                        border: 1px solid rgba(100, 255, 218, 0.3);
+                        background: rgba(0,0,0,0.25);
+                        color: #e6f1ff;
+                        outline: none;
+                    "
+                    />
+                    <button
+                    id="sendManualBtn"
+                    style="
+                        padding: 12px 16px;
+                        border-radius: 8px;
+                        border: 1px solid #64ffda;
+                        background: rgba(100, 255, 218, 0.12);
+                        color: #64ffda;
+                        cursor: pointer;
+                        font-weight: 600;
+                    "
+                    >
+                    Send
+                    </button>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button class="control-btn" onclick="sendManualCommand('anja freeze')">Freeze</button>
+                    <button class="control-btn" onclick="sendManualCommand('anja bring scalpel')">Bring Scalpel</button>
+                    <button class="control-btn" onclick="sendManualCommand('anja idle')">Idle</button>
+                </div>
+                </div>
+            </div>
+
+            <div class="metrics">
+                <div class="metric-card">
+                    <div class="metric-label">Response Time</div>
+                    <div class="metric-value" id="responseTime">45ms</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Accuracy</div>
+                    <div class="metric-value">99.8%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Uptime</div>
+                    <div class="metric-value" id="uptime">0h 0m</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Patient Stats + Emergency -->
+        <div class="panel right-panel">
+        <div id="rightTopBadge" class="right-top-badge disconnected">
+        <div id="rightStatusDot" class="status-dot disconnected"></div>
+        <span id="rightConnectionText">Disconnected</span>
+        </div>
+
+
+        <div class="patient-title">Patient Stats</div>
+
+
+        <div class="patient-item">
+        <div class="patient-left">
+        <span class="patient-icon">💚</span>
+        <span>Heart Rate</span>
+        </div>
+        <div class="patient-value"><span id="hrValue">72</span> <span class="unit">BPM</span></div>
+        </div>
+
+
+        <div class="patient-item">
+        <div class="patient-left">
+        <span class="patient-icon">💧</span>
+        <span>SpO₂</span>
+        </div>
+        <div class="patient-value"><span id="spo2Value">98</span><span class="unit">%</span></div>
+        </div>
+
+
+        <div class="patient-item">
+        <div class="patient-left">
+        <span class="patient-icon">🩺</span>
+        <span>BP</span>
+        </div>
+        <div class="patient-value"><span id="bpValue">120/80</span> <span class="unit">mmHg</span></div>
+        </div>
+
+
+        <div class="patient-item">
+        <div class="patient-left">
+        <span class="patient-icon">🌡️</span>
+        <span>Temp.</span>
+        </div>
+        <div class="patient-value"><span id="tempValue">36.8</span><span class="unit">°C</span></div>
+        </div>
+
+
+        <button class="emergency-btn emergency-btn-big" onclick="emergencyStop()">
+        ⚠️ EMERGENCY STOP
+        </button>
+        </div>
+    </div>
+
+    <script>
+        const itemImages = {
+            gauze: "images/gauze.png",
+            saline: "images/saline.png",
+            scalpel: "images/scalpel.png",
+
+            // Syringes (map multiple canonical slot names to one icon)
+            syringe: "images/syringe.png",
+            syringe_10ml: "images/syringe.png",
+            syringe_5ml: "images/syringe.png",
+            syringe_20ml: "images/syringe.png",
+
+            gloves: "images/gloves.png",
+            idle: "images/idle.png",
+            freeze: "images/freeze.png",
+            hold: "images/hold.png",
+            unknown: "images/unknown.png"
+        };
+        let ws = null;
+        let reconnectInterval = null;
+        let startTime = Date.now();
+
+        function connectWebSocket() {
+            ws = new WebSocket('ws://localhost:8765');
+
+            ws.onopen = function() {
+                console.log('Connected to robot control system');
+                updateConnectionStatus(true);
+                updateVoiceStatus('Voice recognition active');
+                addToLog('🎤 Connected to voice recognition system');
+                addToLog('📢 Say: "A.N.J.A bring scalpel", "A.N.J.A freeze", etc.');
+                
+                if (reconnectInterval) {
+                    clearInterval(reconnectInterval);
+                    reconnectInterval = null;
+                }
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                console.log('Received:', data);
+
+                if (data.type === 'heard') {
+                    addToLog(`👂 HEARD: ${data.text}`);
+                } 
+                else if (data.type === 'command') {
+                    handleCommandResponse(data);
+                } 
+                else if (data.type === 'status') {
+                    addToLog('📡 ' + data.message);
+                }
+            };
+
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                updateConnectionStatus(false);
+            };
+
+            ws.onclose = function() {
+                console.log('Disconnected from robot control system');
+                updateConnectionStatus(false);
+                updateVoiceStatus('Disconnected - Reconnecting...');
+                
+                // Auto-reconnect
+                if (!reconnectInterval) {
+                    reconnectInterval = setInterval(() => {
+                        console.log('Attempting to reconnect...');
+                        connectWebSocket();
+                    }, 3000);
+                }
+            };
+        }
+
+        function updateConnectionStatus(connected) {
+            const rightText = document.getElementById("rightConnectionText");
+            const rightDot = document.getElementById("rightStatusDot");
+            const rightBadge = document.getElementById("rightTopBadge");
+
+
+            if (rightText) rightText.textContent = connected ? "Connected" : "Disconnected";
+
+
+            if (rightDot) {
+            rightDot.className = connected ? "status-dot connected" : "status-dot disconnected";
+            }
+
+
+            if (rightBadge) {
+            rightBadge.className = connected ? "right-top-badge connected" : "right-top-badge disconnected";
+            }
+
+
+            updateVoiceStatus(connected ? "Voice recognition active" : "Disconnected - Reconnecting...");
+        }
+
+        async function startCamera(){
+            const video = document.getElementById("cameraVideo");
+            if (!video) return;
+
+
+            try{
+            const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false
+            });
+            video.srcObject = stream;
+            } catch(err){
+            console.error("Camera error:", err);
+            addToLog("❌ Camera permission denied / camera not available");
+            }
+        }
+
+        function handleCommandResponse(data) {
+            const text = data.text;
+            const response = data.response || {};
+
+            // Server already sends a separate "heard" event; avoid duplicate "heard" logs here.
+            addToLog(`🤖 ${response.message || "Received response."}`);
+
+            updateVoiceStatus(`Processing: "${text}"`);
+
+            // Update mode if specified
+            if (response.mode) {
+                setMode(response.mode);
+            }
+
+            // Update "Camera Feed" / Task display
+            const img = document.getElementById("taskImage");
+            const title = document.getElementById("taskTitle");
+            const msg = document.getElementById("taskMessage");
+
+            const item = response.item || "unknown";
+            const itemLabel = (item || "unknown").replace(/_/g, " ").toUpperCase();
+
+            if (response.action === "bring") {
+                img.src = itemImages[item] || itemImages.unknown;
+                title.textContent = `FETCHING: ${itemLabel}`;
+                msg.textContent = response.message || "Robot is moving to pick up the item...";
+            }
+            else if (response.action === "pending") {
+                // Confirmation-gated action (e.g., bring)
+                img.src = itemImages[item] || itemImages.unknown;
+                title.textContent = "CONFIRM REQUIRED";
+                msg.textContent = response.message || "Say 'confirm' or 'cancel'.";
+            }
+            else if (response.action === "cancel") {
+                img.src = itemImages.idle;
+                title.textContent = "CANCELLED";
+                msg.textContent = response.message || "Awaiting next command...";
+            }
+            else if (response.action === "freeze") {
+                img.src = itemImages.freeze;
+                title.textContent = "EMERGENCY STOP";
+                msg.textContent = response.message || "Robot motion stopped.";
+
+                setMode('idle');
+                document.getElementById('voiceStatus').textContent = 'System halted - Emergency stop active';
+
+            }
+            else if (response.action === "idle") {
+                img.src = itemImages.idle;
+                title.textContent = "IDLE MODE";
+                msg.textContent = response.message || "Awaiting next command...";
+            }
+            else if (response.action === "hold") {
+                img.src = itemImages.hold;
+                title.textContent = "HOLD POSITION";
+                msg.textContent = response.message || "Robot holding position.";
+            }
+            else if (response.action === "ignored") {
+                img.src = itemImages.idle;
+                title.textContent = "IGNORED";
+                msg.textContent = response.message || "Wake word not detected. Start with 'anja ...'.";
+            }
+            else {
+                img.src = itemImages.unknown;
+                title.textContent = "UNKNOWN COMMAND";
+                msg.textContent = response.message || "Try: 'anja bring gauze' / 'anja hold' / 'anja idle' / 'freeze'";
+            }
+
+            // Clear status after 3 seconds (keep pending hint if needed)
+            const nextStatus = (response.action === "pending")
+                ? "Awaiting confirmation (say 'confirm' or 'cancel')..."
+                : "Awaiting voice command...";
+
+            setTimeout(() => {
+                updateVoiceStatus(nextStatus);
+            }, 3000);
+        }
+
+        function updateVoiceStatus(text) {
+            document.getElementById('voiceStatus').textContent = text;
+        }
+
+        function addToLog(message) {
+            const log = document.getElementById('commandLog');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+
+            // Keep only last 50 entries
+            while (log.children.length > 50) {
+                log.removeChild(log.firstChild);
+            }
+        }
+
+        function setMode(mode) {
+            const idleBtn = document.getElementById('idleBtn');
+            const activeBtn = document.getElementById('activeBtn');
+            
+            if (mode === 'idle') {
+                idleBtn.classList.add('active');
+                activeBtn.classList.remove('active');
+            } else {
+                activeBtn.classList.add('active');
+                idleBtn.classList.remove('active');
+            }
+        }
+
+        function sendManualCommand(command) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'manual_command',
+                    text: command
+                }));
+            } else {
+                addToLog('❌ Not connected to robot system');
+            }
+        }
+
+        function emergencyStop() {
+            sendManualCommand('emergency stop');
+        }
+
+        // Mode button handlers
+        document.getElementById('idleBtn').addEventListener('click', () => {
+            sendManualCommand('anja idle');
+        });
+
+        document.getElementById('activeBtn').addEventListener('click', () => {
+            sendManualCommand('anja hold');   // or "anja bring gauze"
+        });
+
+        // Update uptime counter
+        setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            const hours = Math.floor(elapsed / 3600000);
+            const minutes = Math.floor((elapsed % 3600000) / 60000);
+            document.getElementById('uptime').textContent = `${hours}h ${minutes}m`;
+        }, 60000);
+
+        // Connect on page load
+        window.addEventListener('load', () => {
+            connectWebSocket();
+            startCamera();
+        });
+        document.getElementById('sendManualBtn').addEventListener('click', () => {
+        const input = document.getElementById('manualInput');
+        const cmd = input.value.trim();
+        if (!cmd) return;
+        sendManualCommand(cmd);
+        input.value = '';
+        });
+
+        document.getElementById('manualInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('sendManualBtn').click();
+        }
+        });
+    </script>
+</body>
+</html>
